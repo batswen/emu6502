@@ -1,0 +1,329 @@
+package com.batswen.emu6502.cpu;
+
+public final class CPU {
+    private final int NEGATIVE = 128, OVERFLOW = 64, ZERO = 2, CARRY = 1;
+    private int ac, xr, yr, st, sp, pc;
+    private final int[] memory;
+    private boolean cpurunning;
+    
+    public CPU() {
+        memory = new int[65536];
+        for (int i = 0; i < 65536; i++) {
+            memory[i] = 0;
+        }
+        cpurunning = true;
+    }
+    /**
+     * Resets emulator
+     * <p>
+     * also clears ST (lda #$00:pha:plp) and resets SP (ldx #$ff:txs)
+     */
+    public void reset() {
+        pc = memory[0xfffc] + 256 * memory[0xfffd];
+        sp = 0xff;    // ?
+        st = 0b00000000; // ?
+    }
+    /**
+     * Writes a byte to a specified address
+     * 
+     * @param addr  The address ($0000-$ffff)
+     * @param pbyte The byte to poke
+     */
+    public void pokeByte(int addr, int pbyte) {
+        memory[addr] = pbyte;
+    }
+    /**
+     * Reads a byte
+     * 
+     * @param addr
+     * @return      Byte from the address
+     */
+    public int peekByte(int addr) {
+        return memory[addr];
+    }
+    private int peekWord(int addr) { 
+        return memory[addr] + 256 * memory[addr + 1];
+    }
+    private int immediateByte() {
+        return peekByte(pc);
+    }
+    private int addrZPiY() {
+        return peekWord(peekByte(pc)) + yr;
+    }
+    private int addrZPiX() { // Dafuq
+        return peekWord(peekByte(pc) + xr);
+    }
+    private int addrAbs() {
+        int result = peekWord(pc);
+        updatePC();
+        return result;
+    }
+    private int addrBranch() {
+        return pc + 1 + (byte)peekByte(pc);
+    }
+    private int addrAbsInd() {
+        int result = peekWord(peekWord(pc));
+        updatePC();
+        return result;
+    }
+    private int addrAbsX() {
+        int result = peekWord(pc) + xr;
+        updatePC();
+        return result;
+    }
+    private int addrZP() {
+        return peekByte(peekByte(pc));
+    }
+    private int addrZPX() {
+        return (peekWord(pc) & 255) + xr;
+    }
+    private int addrZPY() {
+        return (peekWord(pc) & 255) + yr;
+    }
+    private int addrAbsY() {
+        int result = peekWord(pc) + yr;
+        updatePC();
+        return result;
+    }
+    private void updatePC() {
+        pc = (pc + 1) % 65536;
+    }
+    private void lda(int b) {
+        ac = b;
+        updateFlags(b);
+        updatePC();
+    }
+    private void ldx(int b) {
+        xr = b;
+        updateFlags(b);
+        updatePC();
+    }
+    private void ldy(int b) {
+        yr = b;
+        updateFlags(b);
+        updatePC();
+    }
+    private void sta(int addr) {
+        memory[addr] = ac;
+        updatePC();
+    }
+    private void stx(int addr) {
+        memory[addr] = xr;
+        updatePC();
+    }
+    private void sty(int addr) {
+        memory[addr] = yr;
+        updatePC();
+    }
+    private void push(int b) {
+        memory[0x100 + sp] = b;
+        sp = (sp + 255) & 255; 
+    }
+    private int pop() {
+        sp = (sp + 1) & 255;
+        return memory[0x100 + sp];
+    }
+    private void branch(int flag, int state) {
+        if ((st & flag) == state) {
+            pc = addrBranch();
+        } else {
+            updatePC();
+        }
+    }
+    private void updateFlags(int b) {
+        if (b > 127) {
+            st |= NEGATIVE;
+        } else {
+            st &= 255 - NEGATIVE;
+        }
+        if (b == 0) {
+            st |= ZERO;
+        } else {
+            st &= 255 - ZERO;
+        }
+    }
+    private void clearBit(int bit) {
+        st &= 255 - bit;
+    }
+    private void setBit(int bit) {
+        st |= bit;
+    }
+    /**
+     * Executes an opcode
+     * 
+     * @return false if the program hat ended or failed
+     */
+    public boolean execute() {
+        int opcode = peekByte(pc);
+        if (!cpurunning) {
+            return false;
+        }
+        updatePC();
+        switch (opcode) {
+            case 0x00: // BRK
+                System.out.println(String.format("* BREAK at $%04X", pc - 1));
+                cpurunning = false;
+                break;
+            case 0x08: // PHP
+                push(st);
+                break;
+            case 0x10: // BPL ----
+                branch(NEGATIVE, 0);
+                break;
+            case 0x18: // CLC
+                clearBit(CARRY);
+                break;
+            case 0x20: // JSR ----
+                int target = addrAbs();
+                push(pc >> 8);
+                push(pc & 255);
+                pc = target;
+                break;
+            case 0x28: // PLP
+                st = pop();
+                break;
+            case 0x30: // BMI ----
+                branch(NEGATIVE, NEGATIVE);
+                break;
+            case 0x38: // SEC
+                setBit(CARRY);
+                break;
+            case 0x48: // PHA
+                push(ac);
+                break;
+            case 0x4c: // JMP ----
+                pc = addrAbs();
+                break;
+            case 0x60: // RTS
+                pc = pop() + 256 * pop();
+                updatePC();
+                break;
+            case 0x68: // PLA
+                ac = pop();
+                break;
+            case 0x6c: // JMP (----)
+                pc = addrAbsInd();
+                break;
+            case 0x84: // STY --
+                sty(addrZP());
+                break;
+            case 0x86: // STX --
+                stx(addrZP());
+                break;
+            case 0x88: // DEY
+                yr = (yr + 255) % 256;
+                updateFlags(yr);
+                break;
+            case 0x8a: // TXA
+                ac = xr;
+                break;
+            case 0x8c: // STY ----
+                sty(addrAbs());
+                break;
+            case 0x8d: // STA ----
+                sta(addrAbs());
+                break;
+            case 0x8e: // STX ----
+                stx(addrAbs());
+                break;
+            case 0x90: // BCC ----
+                branch(CARRY, 0);
+                break;
+            case 0x91: // STA (--),Y
+                sta(addrZPiY());
+                break;
+            case 0x94: // STY --,X
+                sty(addrZPX());
+                break;
+            case 0x96: // STX --,Y
+                stx(addrZPY());
+                break;
+            case 0x98: // TYA
+                ac = yr;
+                break;
+            case 0x9a: // TXS
+                sp = xr;
+                break;
+            case 0x9d: // STA ----,X
+                sta(addrAbsX());
+                break;
+            case 0xa0: // LDY #--
+                ldy(immediateByte());
+                break;
+            case 0xa1: // LDA (--,X)
+                lda(addrZPiX());
+                break;
+            case 0xa2: // LDX #--
+                ldx(immediateByte());
+                break;
+            case 0xa5: // LDA --
+                lda(addrZP());
+                break;
+            case 0xa8: // TAY
+                yr = ac;
+                break;
+            case 0xa9: // LDA #--
+                lda(immediateByte());
+                break;
+            case 0xaa: // TAX
+                xr = ac;
+                break;
+            case 0xad: // LDA ----
+                lda(addrAbs());
+                break;
+            case 0xb0: // BCS ----
+                branch(CARRY, CARRY);
+                break;
+            case 0xb1: // LDA (--),Y
+                lda(addrZPiY());
+                break;
+            case 0xb5: // LDA --,X
+                lda(addrZPX());
+                break;
+            case 0xb9: // LDA ----,Y
+                lda(addrAbsY());
+                break;
+            case 0xba: // TSX
+                xr = sp;
+                break;
+            case 0xbd: // LDA ----,X
+                lda(addrAbsX());
+                break;
+            case 0xca: // DEX
+                xr = (xr + 255) % 256;
+                updateFlags(xr);
+                break;
+            case 0xd0: // BNE ----
+                branch(ZERO, 0);
+                break;
+            case 0xe8: // INX
+                xr = (xr + 1) % 256;
+                updateFlags(xr);
+                break;
+            case 0xea: // NOP
+                break;
+            case 0xf0: // BEQ ----
+                branch(ZERO, ZERO);
+                break;
+            case 0xff: // INT #-- // Test command
+                int c = immediateByte();
+                updatePC();
+                switch (c) {
+                    case 0:
+                        System.out.print(ac); // Print AC as number
+                        break;
+                    case 1:
+                        System.out.printf("%c", (char)ac); // Print AC as character
+                        break;
+                    default:
+                        System.out.println(String.format("* Unknown INT at $%04X", pc - 1));
+                        cpurunning = false;
+                }
+                break;
+            default:
+                System.out.println("Error: $" + String.format("%04X: %02X", pc - 1, peekByte(pc - 1)));
+                cpurunning = false;
+        }
+        return true;
+    }
+}
