@@ -9,7 +9,7 @@ public class Run {
         CPU cpu = new CPU();
         Loader loader = new Loader(cpu);
         loader.load("fffc0020");
-        loader.load("00a00005");
+        loader.load("00a02004");
         loader.load(program);
         loader.load("3000a934ff01a932ff0160");
         cpu.reset();
