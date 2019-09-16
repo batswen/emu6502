@@ -1,14 +1,5 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package com.batswen.emu6502.cpu;
 
-/**
- *
- * @author Swen
- */
 public class Loader {
     private final CPU cpu;
     public Loader(CPU cpu) {
