@@ -17,6 +17,7 @@ public final class CPU {
      * Resets emulator
      * <p>
      * also clears ST (lda #$00:pha:plp) and resets SP (ldx #$ff:txs)
+     * </p>
      */
     public void reset() {
         pc = memory[0xfffc] + 256 * memory[0xfffd];
@@ -103,6 +104,21 @@ public final class CPU {
         updateFlags(b);
         updatePC();
     }
+    private void and(int b) {
+        ac = ac & b;
+        updateFlags(ac);
+        updatePC();
+    }
+    private void ora(int b) {
+        ac = ac | b;
+        updateFlags(ac);
+        updatePC();
+    }
+    private void eor(int b) {
+        ac = ac ^ b;
+        updateFlags(ac);
+        updatePC();
+    }
     private void sta(int addr) {
         memory[addr] = ac;
         updatePC();
@@ -179,14 +195,38 @@ public final class CPU {
                 push(pc & 255);
                 pc = target;
                 break;
+            case 0x21: // AND (--,X)
+                and(addrZPiX());
+                break;
+            case 0x25: // AND --,X
+                and(addrZP());
+                break;
             case 0x28: // PLP
                 st = pop();
+                break;
+            case 0x29: // AND #--
+                and(immediateByte());
+                break;
+            case 0x2d: // AND ----
+                and(addrAbs());
                 break;
             case 0x30: // BMI ----
                 branch(NEGATIVE, NEGATIVE);
                 break;
+            case 0x31: // AND (--),Y
+                and(addrZPiY());
+                break;
+            case 0x35:  // AND --,X
+                and(addrZPX());
+                break;
             case 0x38: // SEC
                 setBit(CARRY);
+                break;
+            case 0x39: // AND ----,Y
+                and(addrAbsY());
+                break;
+            case 0x3d: // AND ----,X
+                and(addrAbsX());
                 break;
             case 0x48: // PHA
                 push(ac);
