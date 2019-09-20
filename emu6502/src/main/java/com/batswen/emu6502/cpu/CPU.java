@@ -104,6 +104,13 @@ public final class CPU {
         updateFlags(b);
         updatePC();
     }
+    private void asl(int b) {
+        int c = b & 128;
+        ac = (b << 1) & 255;
+        setCarry(c);
+        updateFlags(ac);
+        updatePC();
+    }
     private void and(int b) {
         ac = ac & b;
         updateFlags(ac);
@@ -147,15 +154,28 @@ public final class CPU {
         }
     }
     private void updateFlags(int b) {
-        if (b > 127) {
-            st |= NEGATIVE;
+        setNegative(b);
+        setZero(b);
+    }
+    private void setNegative(int b) {
+        if (b > 0) {
+            setBit(NEGATIVE);
         } else {
-            st &= 255 - NEGATIVE;
+            clearBit(NEGATIVE);
         }
-        if (b == 0) {
-            st |= ZERO;
+    }
+    private void setCarry(int b) {
+        if (b > 0) {
+            setBit(CARRY);
         } else {
-            st &= 255 - ZERO;
+            clearBit(CARRY);
+        }
+    }
+    private void setZero(int b) {
+        if (b == 0) { // !
+            setBit(ZERO);
+        } else {
+            clearBit(ZERO);
         }
     }
     private void clearBit(int bit) {
@@ -180,14 +200,29 @@ public final class CPU {
                 System.out.println(String.format("* BREAK at $%04X", pc - 1));
                 cpurunning = false;
                 break;
+            case 0x06: // ASL --
+                asl(addrZP());
+                break;
             case 0x08: // PHP
                 push(st);
+                break;
+            case 0x0a: // ASL
+                asl(ac);
+                break;
+            case 0x0e: // ASL ----
+                asl(addrAbs());
                 break;
             case 0x10: // BPL ----
                 branch(NEGATIVE, 0);
                 break;
+            case 0x16: // ASL --,X
+                asl(addrZPX());
+                break;
             case 0x18: // CLC
                 clearBit(CARRY);
+                break;
+            case 0x1e: // ASL ----,X
+                asl(addrAbsX());
                 break;
             case 0x20: // JSR ----
                 int target = addrAbs();
