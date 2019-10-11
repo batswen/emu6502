@@ -200,14 +200,26 @@ public final class CPU {
                 System.out.println(String.format("* BREAK at $%04X", pc - 1));
                 cpurunning = false;
                 break;
+            case 0x01: // ORA (--,X)
+                ora(addrZPiX());
+                break;
+            case 0x05: // ORA --
+                ora(addrZP());
+                break;
             case 0x06: // ASL --
                 asl(addrZP());
                 break;
             case 0x08: // PHP
                 push(st);
                 break;
+            case 0x09: // ORA #--
+                ora(immediateByte());
+                break;
             case 0x0a: // ASL
                 asl(ac);
+                break;
+            case 0x0d: // ORA ----
+                ora(addrAbs());
                 break;
             case 0x0e: // ASL ----
                 asl(addrAbs());
@@ -215,11 +227,23 @@ public final class CPU {
             case 0x10: // BPL ----
                 branch(NEGATIVE, 0);
                 break;
+            case 0x11: // ORA (--),Y
+                ora(addrZPiY());
+                break;
+            case 0x15: // ORA --,X
+                ora(addrZPX());
+                break;
             case 0x16: // ASL --,X
                 asl(addrZPX());
                 break;
             case 0x18: // CLC
                 clearBit(CARRY);
+                break;
+            case 0x19: // ORA ----,Y
+                ora(addrAbsY());
+                break;
+            case 0x1d: // ORA ----,X
+                ora(addrAbsX());
                 break;
             case 0x1e: // ASL ----,X
                 asl(addrAbsX());
@@ -263,11 +287,35 @@ public final class CPU {
             case 0x3d: // AND ----,X
                 and(addrAbsX());
                 break;
+            case 0x41: // EOR (--,X)
+                eor(addrZPiX());
+                break;
+            case 0x45: // EOR --
+                eor(addrZP());
+                break;
             case 0x48: // PHA
                 push(ac);
                 break;
+            case 0x49: // EOR #--
+                eor(immediateByte());
+                break;
             case 0x4c: // JMP ----
                 pc = addrAbs();
+                break;
+            case 0x4d: // EOR ----
+                eor(addrAbs());
+                break;
+            case 0x51: // EOR (--),Y
+                eor(addrZPiY());
+                break;
+            case 0x55: // EOR --,X
+                eor(addrZPX());
+                break;
+            case 0x59: // EOR ----,Y
+                eor(addrAbsY());
+                break;
+            case 0x5d: // EOR ----,X
+                eor(addrAbsX());
                 break;
             case 0x60: // RTS
                 pc = pop() + 256 * pop();
